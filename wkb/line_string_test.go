@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/terranodo/tegola/wkb"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola/wkb"
 )
 
-func cmpLines(l1, l2 wkb.LineString) (bool, string) {
-
+func cmpLines(l1, l2 geo.LineString) (bool, string) {
 	if len(l1) != len(l2) {
 		return false, fmt.Sprintf(
 			"Lengths of lines do not match.\n"+
@@ -35,8 +35,7 @@ func TestLineString(t *testing.T) {
 			bytes: []byte{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 240, 63, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 0, 16, 64},
 			bom:   binary.LittleEndian,
 			expected: &wkb.LineString{
-				wkb.NewPoint(1, 2),
-				wkb.NewPoint(3, 4),
+				LineString: geo.LineString{{1, 2}, {3, 4}},
 			},
 		},
 	}
@@ -53,7 +52,7 @@ func TestLineString(t *testing.T) {
 			t.Errorf("Got unexpected error %v", err)
 			return
 		}
-		if ok, err := cmpLines(expected, ls); !ok {
+		if ok, err := cmpLines(expected.LineString, ls.LineString); !ok {
 			t.Errorf("Failed LineString Test: %v:%v\n %v", num, tcase.bytes, err)
 		}
 	})
@@ -87,8 +86,10 @@ func TestMultiLineString(t *testing.T) {
 			},
 			bom: binary.LittleEndian,
 			expected: &wkb.MultiLineString{
-				wkb.LineString{wkb.NewPoint(10, 10), wkb.NewPoint(20, 20), wkb.NewPoint(10, 40)},
-				wkb.LineString{wkb.NewPoint(40, 40), wkb.NewPoint(30, 30), wkb.NewPoint(40, 20), wkb.NewPoint(30, 10)},
+				MultiLineString: geo.MultiLineString{
+					{{10, 10}, {20, 20}, {10, 40}},
+					{{40, 40}, {30, 30}, {40, 20}, {30, 10}},
+				},
 			},
 		},
 	}
@@ -105,7 +106,7 @@ func TestMultiLineString(t *testing.T) {
 			t.Errorf("Got unexpected error %v", err)
 			return
 		}
-		if len(ls) != len(expected) {
+		if len(ls.MultiLineString) != len(expected.MultiLineString) {
 			t.Errorf(
 				"Failed MultiLineString Test %v: %v "+
 					"Number of expected lines is wrong. "+
@@ -114,16 +115,16 @@ func TestMultiLineString(t *testing.T) {
 					"Lines gotten:\n%v\n",
 				num,
 				tcase.bytes,
-				len(expected),
-				len(ls),
+				len(expected.MultiLineString),
+				len(ls.MultiLineString),
 				expected,
 				ls,
 			)
 			return
 		}
-		for j := range ls {
-			if ok, err := cmpLines(expected[j], ls[j]); !ok {
-				t.Errorf("Failed MultiLineString Test(%v) for lines (%v -- %v): %v\n%v ", num, expected[j], ls[j], tcase.bytes, err)
+		for j := range ls.MultiLineString {
+			if ok, err := cmpLines(expected.MultiLineString[j], ls.MultiLineString[j]); !ok {
+				t.Errorf("Failed MultiLineString Test(%v) for lines (%v -- %v): %v\n%v ", num, expected.MultiLineString[j], ls.MultiLineString[j], tcase.bytes, err)
 				return
 			}
 		}

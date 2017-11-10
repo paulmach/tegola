@@ -3,6 +3,8 @@ package wkb
 import (
 	"encoding/binary"
 	"io"
+
+	"github.com/paulmach/geo"
 )
 
 //
@@ -16,11 +18,17 @@ WKBGeometry      wkbGeometries[num_wkbGeometries]
 */
 
 // Collection is a collection of geometries.
-type Collection []Geometry
+type Collection struct {
+	geo.Collection
+}
 
 // Type returns the type number of this geometry, by the spec it's 7.
 func (Collection) Type() uint32 {
 	return GeoGeometryCollection
+}
+
+func (col *Collection) Geometry() geo.Geometry {
+	return col.Collection
 }
 
 // Decode decodes the geometry from a binary representation.
@@ -34,11 +42,11 @@ func (col *Collection) Decode(bom binary.ByteOrder, r io.Reader) error {
 		if err != nil {
 			return err
 		}
-		*col = append(*col, geo)
+		col.Collection = append(col.Collection, geo)
 	}
 	return nil
 }
 
 func (col *Collection) String() string {
-	return WKT(col) // If we have a failure we don't care
+	return WKT(col.Collection) // If we have a failure we don't care
 }

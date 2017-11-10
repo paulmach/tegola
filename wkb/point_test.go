@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/terranodo/tegola/wkb"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola/wkb"
 )
 
-func cmpPoint(p1, p2 wkb.Point) (bool, string) {
+func cmpPoint(p1, p2 geo.Point) (bool, string) {
 	if p1.X() != p2.X() {
 		return false, fmt.Sprintf(" X value of points do not match.p1:(%v) p2:(%v)", p1, p2)
 	}
@@ -40,7 +41,7 @@ func TestPoint(t *testing.T) {
 	for i, test := range testcases {
 		buf := bytes.NewReader(test.bytes)
 		p.Decode(test.bom, buf)
-		if ok, err := cmpPoint(test.expected, p); !ok {
+		if ok, err := cmpPoint(test.expected.Point, p.Point); !ok {
 			t.Errorf("Failed Test %v: %v", i, err)
 		}
 	}
@@ -74,10 +75,7 @@ func TestMultiPoint(t *testing.T) {
 			},
 			bom: binary.LittleEndian,
 			expected: wkb.MultiPoint{
-				wkb.NewPoint(10, 40),
-				wkb.NewPoint(40, 30),
-				wkb.NewPoint(20, 20),
-				wkb.NewPoint(30, 10),
+				MultiPoint: geo.MultiPoint{{10, 40}, {40, 30}, {20, 20}, {30, 10}},
 			},
 		},
 	}
@@ -86,12 +84,12 @@ func TestMultiPoint(t *testing.T) {
 	for i, test := range testcases {
 		buf := bytes.NewReader(test.bytes)
 		p.Decode(test.bom, buf)
-		if len(test.expected) != len(p) {
+		if len(test.expected.MultiPoint) != len(p.MultiPoint) {
 			t.Errorf("Failed test %v: Not the same number of points, Expected: %v, Got: %v", test.expected, p)
 			continue
 		}
-		for j, ep := range test.expected {
-			if ok, err := cmpPoint(ep, p[j]); !ok {
+		for j, ep := range test.expected.MultiPoint {
+			if ok, err := cmpPoint(ep, p.MultiPoint[j]); !ok {
 				t.Errorf("Failed Test %v: To match point %v, %v", i, err)
 			}
 

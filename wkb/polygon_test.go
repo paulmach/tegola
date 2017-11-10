@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/terranodo/tegola/wkb"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola/wkb"
 )
 
-func cmpPolygons(p1, p2 wkb.Polygon) (bool, string) {
+func cmpPolygons(p1, p2 geo.Polygon) (bool, string) {
 	if len(p1) != len(p2) {
-
 		return false, fmt.Sprintf(
 			"Polygon lengths do not match. "+
 				"Number of lines in Polygon1: %v\n"+
@@ -20,7 +20,7 @@ func cmpPolygons(p1, p2 wkb.Polygon) (bool, string) {
 		)
 	}
 	for j := range p1 {
-		if ok, err := cmpLines(p1[j], p2[j]); !ok {
+		if ok, err := cmpLines(geo.LineString(p1[j]), geo.LineString(p2[j])); !ok {
 			return false, fmt.Sprintf("Line %v did not match: %v", j, err)
 		}
 	}
@@ -47,13 +47,9 @@ func TestPolygon(t *testing.T) {
 			},
 			bom: binary.LittleEndian,
 			expected: &wkb.Polygon{
-				wkb.LineString{
-					wkb.NewPoint(30, 10),
-					wkb.NewPoint(40, 40),
-					wkb.NewPoint(20, 40),
-					wkb.NewPoint(10, 20),
-					wkb.NewPoint(30, 10),
-				},
+				Polygon: geo.Polygon{{
+					{30, 10}, {40, 40}, {20, 40}, {10, 20}, {30, 10},
+				}},
 			},
 		},
 		{
@@ -83,18 +79,9 @@ func TestPolygon(t *testing.T) {
 			},
 			bom: binary.LittleEndian,
 			expected: &wkb.Polygon{
-				wkb.LineString{
-					wkb.NewPoint(35, 10),
-					wkb.NewPoint(45, 45),
-					wkb.NewPoint(15, 40),
-					wkb.NewPoint(10, 20),
-					wkb.NewPoint(35, 10),
-				},
-				wkb.LineString{
-					wkb.NewPoint(20, 30),
-					wkb.NewPoint(35, 35),
-					wkb.NewPoint(30, 20),
-					wkb.NewPoint(20, 30),
+				Polygon: geo.Polygon{
+					{{35, 10}, {45, 45}, {15, 40}, {10, 20}, {35, 10}},
+					{{20, 30}, {35, 35}, {30, 20}, {20, 30}},
 				},
 			},
 		},
@@ -112,7 +99,7 @@ func TestPolygon(t *testing.T) {
 			t.Errorf("Got unexpected error %v", err)
 			return
 		}
-		if ok, err := cmpPolygons(expected, p); !ok {
+		if ok, err := cmpPolygons(expected.Polygon, p.Polygon); !ok {
 			t.Errorf("Failed Polygon Test %v: %v", num, err)
 		}
 	})
@@ -153,21 +140,12 @@ func TestMultiPolygon(t *testing.T) {
 			},
 			bom: binary.LittleEndian,
 			expected: &wkb.MultiPolygon{
-				wkb.Polygon{
-					wkb.LineString{
-						wkb.NewPoint(30, 20),
-						wkb.NewPoint(45, 40),
-						wkb.NewPoint(10, 40),
-						wkb.NewPoint(30, 20),
+				MultiPolygon: geo.MultiPolygon{
+					{
+						{{30, 20}, {45, 40}, {10, 40}, {30, 20}},
 					},
-				},
-				wkb.Polygon{
-					wkb.LineString{
-						wkb.NewPoint(15, 5),
-						wkb.NewPoint(40, 10),
-						wkb.NewPoint(10, 20),
-						wkb.NewPoint(5, 10),
-						wkb.NewPoint(15, 5),
+					{
+						{{15, 5}, {40, 10}, {10, 20}, {5, 10}, {15, 5}},
 					},
 				},
 			},
@@ -217,28 +195,13 @@ func TestMultiPolygon(t *testing.T) {
 			},
 			bom: binary.LittleEndian,
 			expected: &wkb.MultiPolygon{
-				wkb.Polygon{
-					wkb.LineString{
-						wkb.NewPoint(40, 40),
-						wkb.NewPoint(20, 45),
-						wkb.NewPoint(45, 30),
-						wkb.NewPoint(40, 40),
+				MultiPolygon: geo.MultiPolygon{
+					{
+						{{40, 40}, {20, 45}, {45, 30}, {40, 40}},
 					},
-				},
-				wkb.Polygon{
-					wkb.LineString{
-						wkb.NewPoint(20, 35),
-						wkb.NewPoint(10, 30),
-						wkb.NewPoint(10, 10),
-						wkb.NewPoint(30, 5),
-						wkb.NewPoint(45, 20),
-						wkb.NewPoint(20, 35),
-					},
-					wkb.LineString{
-						wkb.NewPoint(30, 20),
-						wkb.NewPoint(20, 15),
-						wkb.NewPoint(20, 25),
-						wkb.NewPoint(30, 20),
+					{
+						{{20, 35}, {10, 30}, {10, 10}, {30, 5}, {45, 20}, {20, 35}},
+						{{30, 20}, {20, 15}, {20, 25}, {30, 20}},
 					},
 				},
 			},
@@ -256,11 +219,11 @@ func TestMultiPolygon(t *testing.T) {
 			t.Errorf("Got unexpected error %v", err)
 			return
 		}
-		if len(expected) != len(p) {
+		if len(expected.MultiPolygon) != len(p.MultiPolygon) {
 			t.Errorf("Length of Multipolygon do not match for Test %v", num)
 		}
-		for i := range expected {
-			if ok, err := cmpPolygons(expected[i], p[i]); !ok {
+		for i := range expected.MultiPolygon {
+			if ok, err := cmpPolygons(expected.MultiPolygon[i], p.MultiPolygon[i]); !ok {
 				t.Errorf("Failed Multipolygon test %v for polygon %v: %v", num, i, err)
 			}
 		}

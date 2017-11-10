@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/terranodo/tegola"
-	"github.com/terranodo/tegola/basic"
+	"github.com/paulmach/geo"
 )
 
 //Point is a basic type, this describes a 2D point.
 type Point struct {
-	basic.Point
+	geo.Point
 }
 
 //Type returns the type constant for this Geometry.
@@ -33,17 +32,27 @@ func (p *Point) String() string {
 	return WKT(p) // If we have a failure we don't care
 }
 
+func (p *Point) Geometry() geo.Geometry {
+	return p.Point
+}
+
 //NewPoint creates a new point structure.
 func NewPoint(x, y float64) Point {
-	return Point{basic.Point{x, y}}
+	return Point{geo.Point{x, y}}
 }
 
 //MultiPoint holds one or more independent points in a group
-type MultiPoint []Point
+type MultiPoint struct {
+	geo.MultiPoint
+}
 
 //Type returns the type constant for a Mulipoint geometry
 func (MultiPoint) Type() uint32 {
 	return GeoMultiPoint
+}
+
+func (mp *MultiPoint) Geometry() geo.Geometry {
+	return mp.MultiPoint
 }
 
 //Decode decodes the byte stream in the a grouping of points.
@@ -64,20 +73,12 @@ func (mp *MultiPoint) Decode(bom binary.ByteOrder, r io.Reader) error {
 		if err := p.Decode(byteOrder, r); err != nil {
 			return err
 		}
-		*mp = append(*mp, *p)
+		mp.MultiPoint = append(mp.MultiPoint, p.Point)
 	}
 	return nil
 }
 
-//Points returns a copy of the points in the group.
-func (mp *MultiPoint) Points() (pts []tegola.Point) {
-	for i := range *mp {
-		pts = append(pts, &(*mp)[i])
-	}
-	return pts
-}
-
 //String returns the WTK version of the geometry.
 func (mp *MultiPoint) String() string {
-	return WKT(mp) // If we have a failure we don't care
+	return WKT(mp.MultiPoint) // If we have a failure we don't care
 }

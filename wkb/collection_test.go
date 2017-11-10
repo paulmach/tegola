@@ -4,7 +4,8 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/terranodo/tegola/wkb"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola/wkb"
 )
 
 func newPoint(x, y float64) *wkb.Point {
@@ -31,10 +32,9 @@ func TestCollection(t *testing.T) {
 			},
 			bom: binary.LittleEndian,
 			expected: &wkb.Collection{
-				newPoint(4, 6),
-				&wkb.LineString{
-					wkb.NewPoint(4, 6),
-					wkb.NewPoint(7, 10),
+				Collection: geo.Collection{
+					geo.Point{4, 6},
+					geo.LineString{{4, 6}, {7, 10}},
 				},
 			},
 		},
@@ -51,12 +51,12 @@ func TestCollection(t *testing.T) {
 			t.Errorf("Got unexpected error %v", err)
 			return
 		}
-		if len(expected) != len(p) {
+		if len(expected.Collection) != len(p.Collection) {
 			t.Errorf("Test %v: Collection did not get decoded correctly, expected: %v got: %v", num, expected, p)
 			return
 		}
-		for i := range expected {
-			if expected[i].Type() != p[i].Type() {
+		for i := range expected.Collection {
+			if expected.Collection[i].GeoJSONType() != p.Collection[i].GeoJSONType() {
 				t.Errorf("Test %v: expected[%v]: %v got: %v", num, i, expected, p)
 			}
 		}

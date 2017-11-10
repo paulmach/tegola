@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/terranodo/tegola/wkb"
+	"github.com/paulmach/tegola/wkb"
 )
 
 type TestCase struct {

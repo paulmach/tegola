@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/terranodo/tegola"
+	"github.com/paulmach/geo"
 )
 
 //  geometry types
@@ -30,6 +30,7 @@ const (
 // Geometry describes a basic Geometry type that can decode it's self.
 type Geometry interface {
 	Decode(bom binary.ByteOrder, r io.Reader) error
+	Geometry() geo.Geometry
 	Type() uint32
 }
 
@@ -51,48 +52,41 @@ func decodeByteOrderType(r io.Reader) (byteOrder binary.ByteOrder, typ uint32, e
 	return byteOrder, typ, err
 }
 
-func encode(bom binary.ByteOrder, geometry tegola.Geometry) (data []interface{}) {
+func encode(bom binary.ByteOrder, geometry geo.Geometry) (data []interface{}) {
 
 	if bom == binary.LittleEndian {
 		data = append(data, byte(1))
 	} else {
 		data = append(data, byte(0))
 	}
-	switch geo := geometry.(type) {
+	switch g := geometry.(type) {
 	default:
 		return nil
-	case tegola.Point:
+	case geo.Point:
 		data = append(data, GeoPoint)
-		data = append(data, geo.X(), geo.Y())
+		data = append(data, g.X(), g.Y())
 		return data
-	case tegola.MultiPoint:
+	case geo.MultiPoint:
 		data = append(data, GeoMultiPoint)
-		pts := geo.Points()
-		if len(pts) == 0 {
+		if len(g) == 0 {
 			return data
 		}
-		for _, p := range pts {
-			pd := encode(bom, p)
-			if pd == nil {
-				return nil
-			}
-			data = append(data, pd...)
+		for _, p := range g {
+			data = append(data, encode(bom, p)...)
 		}
 		return data
-	case tegola.LineString:
+	case geo.LineString:
 		data = append(data, GeoLineString)
-		pts := geo.Subpoints()
-		data = append(data, uint32(len(pts))) // Number of points in the line string
-		for i := range pts {
-			data = append(data, pts[i]) // The points.
+		data = append(data, uint32(len(g))) // Number of points in the line string
+		for i := range g {
+			data = append(data, g[i]) // The points.
 		}
 		return data
 
-	case tegola.MultiLine:
+	case geo.MultiLineString:
 		data = append(data, GeoMultiLineString)
-		lns := geo.Lines()
-		data = append(data, uint32(len(lns))) // Number of lines in the Multi line string
-		for _, l := range lns {
+		data = append(data, len(g)) // Number of lines in the Multi line string
+		for _, l := range g {
 			ld := encode(bom, l)
 			if ld == nil {
 				return nil
@@ -101,23 +95,20 @@ func encode(bom binary.ByteOrder, geometry tegola.Geometry) (data []interface{})
 		}
 		return data
 
-	case tegola.Polygon:
+	case geo.Polygon:
 		data = append(data, GeoPolygon)
-		lns := geo.Sublines()
-		data = append(data, uint32(len(lns))) // Number of rings in the polygon
-		for i := range lns {
-			pts := lns[i].Subpoints()
-			data = append(data, uint32(len(pts))) // Number of points in the ring
-			for i := range pts {
-				data = append(data, pts[i]) // The points in the ring
+		data = append(data, uint32(len(g))) // Number of rings in the polygon
+		for _, r := range g {
+			data = append(data, uint32(len(r))) // Number of points in the ring
+			for _, p := range r {
+				data = append(data, p) // The points in the ring
 			}
 		}
 		return data
-	case tegola.MultiPolygon:
+	case geo.MultiPolygon:
 		data = append(data, GeoMultiPolygon)
-		pls := geo.Polygons()
-		data = append(data, uint32(len(pls))) // Number of Polygons in the Multi.
-		for _, p := range pls {
+		data = append(data, uint32(len(g))) // Number of Polygons in the Multi.
+		for _, p := range g {
 			pd := encode(bom, p)
 			if pd == nil {
 				return nil
@@ -125,12 +116,11 @@ func encode(bom binary.ByteOrder, geometry tegola.Geometry) (data []interface{})
 			data = append(data, pd...)
 		}
 		return data
-	case tegola.Collection:
+	case geo.Collection:
 		data = append(data, GeoGeometryCollection)
-		geometries := geo.Geometries()
-		data = append(data, uint32(len(geometries))) // Number of Geometries
-		for _, g := range geometries {
-			gd := encode(bom, g)
+		data = append(data, uint32(len(g))) // Number of Geometries
+		for _, geom := range g {
+			gd := encode(bom, geom)
 			if gd == nil {
 				return nil
 			}
@@ -142,125 +132,50 @@ func encode(bom binary.ByteOrder, geometry tegola.Geometry) (data []interface{})
 
 // Encode will encode the given Geometry as a binary representation with the given
 // byte order, and write it to the provided io.Writer.
-func Encode(w io.Writer, bom binary.ByteOrder, geometry tegola.Geometry) error {
-	data := encode(bom, geometry)
+func Encode(w io.Writer, bom binary.ByteOrder, geom geo.Geometry) error {
+	data := encode(bom, geom)
 	if data == nil {
-		return fmt.Errorf("Unabled to encode %v", geometry)
+		return fmt.Errorf("Unabled to encode %v", geom)
 	}
 	return binary.Write(w, bom, data)
 }
 
-// WKB casts a tegola.Geometry to a wkb.Geometry type.
-// NOTE: Not sure if this is needed. I'm actually wondering if wkb types are even
-// needed, It seems like they could just be aliases to basic types, with additional
-// methods on them. -gdey
-func WKB(geometry tegola.Geometry) (geo Geometry, err error) {
-	switch geo := geometry.(type) {
-	case tegola.Point:
-		p := NewPoint(geo.X(), geo.Y())
-		return &p, nil
-	case tegola.Point3: // Not supported.
-	case tegola.LineString:
-		l := LineString{}
-		for _, p := range geo.Subpoints() {
-			l = append(l, NewPoint(p.X(), p.Y()))
-		}
-		return &l, nil
-	case tegola.MultiLine:
-		ml := MultiLineString{}
-		for _, l := range geo.Lines() {
-			g, err := WKB(l)
-			if err != nil {
-				return nil, err
-			}
-			lg, ok := g.(*LineString)
-			if !ok {
-				return nil, fmt.Errorf("Was not able to convert to LineString: %v", lg)
-			}
-			ml = append(ml, *lg)
-		}
-		return &ml, nil
-	case tegola.Polygon:
-		p := Polygon{}
-		for _, l := range geo.Sublines() {
-			g, err := WKB(l)
-			if err != nil {
-				return nil, err
-			}
-			lg, ok := g.(*LineString)
-			if !ok {
-				return nil, fmt.Errorf("Was not able to convert to LineString: %v", lg)
-			}
-			p = append(p, *lg)
-		}
-		return &p, nil
-	case tegola.MultiPolygon:
-		mp := MultiPolygon{}
-		for _, p := range geo.Polygons() {
-			g, err := WKB(p)
-			if err != nil {
-				return nil, err
-			}
-			pg, ok := g.(*Polygon)
-			if !ok {
-				return nil, fmt.Errorf("Was not able to convert to Polygon: %v", g)
-			}
-			mp = append(mp, *pg)
-		}
-		return &mp, nil
-	case tegola.Collection:
-		col := Collection{}
-		for _, c := range geo.Geometries() {
-			g, err := WKB(c)
-			if err != nil {
-				return nil, err
-			}
-			cg, ok := g.(Geometry)
-			if !ok {
-				return nil, fmt.Errorf("Was not able to convert to a Geometry type: %v", cg)
-			}
-			col = append(col, cg)
-		}
-		return &col, nil
-	}
-	return nil, fmt.Errorf("Not supported")
-}
-
 // DecodeBytes will decode the type into a Geometry
-func DecodeBytes(b []byte) (geo Geometry, err error) {
+func DecodeBytes(b []byte) (geo.Geometry, error) {
 	buff := bytes.NewReader(b)
 	return Decode(buff)
 }
 
 // Decode is the main function that given a io.Reader will attempt to decode the
 // Geometry from the byte stream.
-func Decode(r io.Reader) (geo Geometry, err error) {
-
+func Decode(r io.Reader) (geo.Geometry, error) {
 	byteOrder, typ, err := decodeByteOrderType(r)
 
 	if err != nil {
 		return nil, err
 	}
+
+	var geom Geometry
 	switch typ {
 	case GeoPoint:
-		geo = new(Point)
+		geom = new(Point)
 	case GeoMultiPoint:
-		geo = new(MultiPoint)
+		geom = new(MultiPoint)
 	case GeoLineString:
-		geo = new(LineString)
+		geom = new(LineString)
 	case GeoMultiLineString:
-		geo = new(MultiLineString)
+		geom = new(MultiLineString)
 	case GeoPolygon:
-		geo = new(Polygon)
+		geom = new(Polygon)
 	case GeoMultiPolygon:
-		geo = new(MultiPolygon)
+		geom = new(MultiPolygon)
 	case GeoGeometryCollection:
-		geo = new(Collection)
+		geom = new(Collection)
 	default:
 		return nil, fmt.Errorf("Unknown Geometry! %v", typ)
 	}
-	if err := geo.Decode(byteOrder, r); err != nil {
+	if err := geom.Decode(byteOrder, r); err != nil {
 		return nil, err
 	}
-	return geo, nil
+	return geom.Geometry(), nil
 }
