@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/terranodo/tegola"
-	"github.com/terranodo/tegola/provider/postgis"
+	"github.com/paulmach/tegola"
+	"github.com/paulmach/tegola/provider/postgis"
 )
 
 func TestNewProvider(t *testing.T) {

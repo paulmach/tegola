@@ -3,9 +3,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/terranodo/tegola"
-	"github.com/terranodo/tegola/basic"
-	"github.com/terranodo/tegola/mvt"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola"
+	"github.com/paulmach/tegola/mvt"
 )
 
 //	creates a debug layer with z/x/y encoded as a point
@@ -17,20 +17,13 @@ func debugLayer(tile tegola.Tile) *mvt.Layer {
 	layer := mvt.Layer{
 		Name: "debug",
 	}
-	xlen := ext.Maxx - ext.Minx
-	ylen := ext.Maxy - ext.Miny
 
 	//	tile outlines
 	outline := mvt.Feature{
 		Tags: map[string]interface{}{
 			"type": "debug_outline",
 		},
-		Geometry: &basic.Line{ //	tile outline
-			basic.Point{ext.Minx, ext.Miny},
-			basic.Point{ext.Maxx, ext.Miny},
-			basic.Point{ext.Maxx, ext.Maxy},
-			basic.Point{ext.Minx, ext.Maxy},
-		},
+		Geometry: geo.LineString(ext.ToRing()),
 	}
 
 	//	new feature
@@ -39,10 +32,7 @@ func debugLayer(tile tegola.Tile) *mvt.Layer {
 			"type": "debug_text",
 			"zxy":  fmt.Sprintf("Z:%v, X:%v, Y:%v", tile.Z, tile.X, tile.Y),
 		},
-		Geometry: &basic.Point{ //	middle of the tile
-			ext.Minx + (xlen / 2),
-			ext.Miny + (ylen / 2),
-		},
+		Geometry: ext.Center(), // middle of the tile
 	}
 
 	layer.AddFeatures(outline, zxy)

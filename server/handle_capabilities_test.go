@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/dimfeld/httptreemux"
-	"github.com/terranodo/tegola/server"
+	"github.com/paulmach/tegola/server"
 )
 
 func TestHandleCapabilities(t *testing.T) {

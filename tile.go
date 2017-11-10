@@ -1,6 +1,10 @@
 package tegola
 
-import "math"
+import (
+	"math"
+
+	"github.com/paulmach/geo"
+)
 
 //Tile slippy map tilenames
 //	http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
@@ -31,18 +35,18 @@ func (t *Tile) Num2Deg() (lat, lng float64) {
 //BoundingBox returns the bound box coordinates for upper left (ulx, uly) and lower right (lrx, lry)
 // in web mercator projection
 // ported from: https://raw.githubusercontent.com/mapbox/postgis-vt-util/master/postgis-vt-util.sql
-func (t *Tile) BoundingBox() BoundingBox {
+func (t *Tile) BoundingBox() geo.Bound {
 	max := 20037508.34
 
 	//	resolution
 	res := (max * 2) / math.Exp2(float64(t.Z))
 
-	return BoundingBox{
-		Minx: -max + (float64(t.X) * res),
-		Miny: max - (float64(t.Y) * res),
-		Maxx: -max + (float64(t.X) * res) + res,
-		Maxy: max - (float64(t.Y) * res) - res,
-	}
+	return geo.NewBound(
+		-max+(float64(t.X)*res),
+		-max+(float64(t.X)*res)+res,
+		max-(float64(t.Y)*res),
+		max-(float64(t.Y)*res)-res,
+	)
 }
 
 //ZRes takes a web mercator zoom level and returns the pixel resolution for that

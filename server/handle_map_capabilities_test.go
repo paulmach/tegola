@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/dimfeld/httptreemux"
-	"github.com/terranodo/tegola/server"
-	"github.com/terranodo/tegola/tilejson"
+	"github.com/paulmach/tegola/server"
+	"github.com/paulmach/tegola/tilejson"
 )
 
 func TestHandleMapCapabilities(t *testing.T) {

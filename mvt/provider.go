@@ -1,6 +1,6 @@
 package mvt
 
-import "github.com/terranodo/tegola"
+import "github.com/paulmach/tegola"
 
 //Provider is the mechinism by which the system talks to different data providers.
 type Provider interface {

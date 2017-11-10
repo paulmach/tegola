@@ -3,7 +3,7 @@ package tegola_test
 import (
 	"testing"
 
-	"github.com/terranodo/tegola"
+	"github.com/paulmach/tegola"
 )
 
 func TestTileNum2Deg(t *testing.T) {
@@ -66,17 +66,17 @@ func TestTileBBox(t *testing.T) {
 	for i, test := range testcases {
 		bbox := test.tile.BoundingBox()
 
-		if bbox.Minx != test.minx {
-			t.Errorf("Failed test %v. Expected minx (%v), got (%v)", i, test.minx, bbox.Minx)
+		if bbox.Left() != test.minx {
+			t.Errorf("Failed test %v. Expected minx (%v), got (%v)", i, test.minx, bbox.Left())
 		}
-		if bbox.Miny != test.miny {
-			t.Errorf("Failed test %v. Expected miny (%v), got (%v)", i, test.miny, bbox.Miny)
+		if bbox.Bottom() != test.miny {
+			t.Errorf("Failed test %v. Expected miny (%v), got (%v)", i, test.miny, bbox.Bottom())
 		}
-		if bbox.Maxx != test.maxx {
-			t.Errorf("Failed test %v. Expected maxx (%v), got (%v)", i, test.maxx, bbox.Maxx)
+		if bbox.Right() != test.maxx {
+			t.Errorf("Failed test %v. Expected maxx (%v), got (%v)", i, test.maxx, bbox.Right())
 		}
-		if bbox.Maxy != test.maxy {
-			t.Errorf("Failed test %v. Expected maxy (%v), got (%v)", i, test.maxy, bbox.Maxy)
+		if bbox.Top() != test.maxy {
+			t.Errorf("Failed test %v. Expected maxy (%v), got (%v)", i, test.maxy, bbox.Top())
 		}
 	}
 }

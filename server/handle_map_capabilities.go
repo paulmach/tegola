@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/dimfeld/httptreemux"
-	"github.com/terranodo/tegola/tilejson"
+	"github.com/paulmach/tegola/tilejson"
 )
 
 type HandleMapCapabilities struct {

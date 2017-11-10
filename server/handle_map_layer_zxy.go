@@ -10,8 +10,8 @@ import (
 
 	"github.com/dimfeld/httptreemux"
 	"github.com/golang/protobuf/proto"
-	"github.com/terranodo/tegola"
-	"github.com/terranodo/tegola/mvt"
+	"github.com/paulmach/tegola"
+	"github.com/paulmach/tegola/mvt"
 )
 
 type HandleMapLayerZXY struct {

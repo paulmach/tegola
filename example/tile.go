@@ -6,9 +6,9 @@ import (
 	"log"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/terranodo/tegola"
-	"github.com/terranodo/tegola/mvt"
-	"github.com/terranodo/tegola/wkb"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola/mvt"
+	"github.com/paulmach/tegola/wkb"
 )
 
 // TileExample is a quick example of how to use the interface to marshal a tile.
@@ -16,7 +16,7 @@ func TileExample() {
 	// We have our point in wkb format.
 	var point = []byte{0, 0, 0, 0, 1, 70, 129, 246, 35, 46, 74, 93, 192, 3, 70, 27, 60, 175, 91, 64, 64}
 	pointReader := bytes.NewReader(point)
-	geo, err := wkb.Decode(pointReader)
+	geom, err := wkb.Decode(pointReader)
 	if err != nil {
 		panic(err)
 	}
@@ -32,7 +32,7 @@ func TileExample() {
 			"Name": "Point Item",
 			"Foo":  "Point Item",
 		},
-		Geometry: geo,
+		Geometry: geom,
 	}
 	// Create a new Layer, a Layer requires a name. This name should be unique within a tile.
 	layer1 := mvt.Layer{
@@ -44,7 +44,7 @@ func TileExample() {
 			"Name": "Point Item",
 			"Foo":  "Point Item",
 		},
-		Geometry: geo,
+		Geometry: geom,
 	}
 
 	layer1.AddFeatures(feature1, feature2)
@@ -67,11 +67,7 @@ func TileExample() {
 
 	// VTile is the protobuff representation of the tile. This is what you can
 	// send to the protobuff Marshal functions.
-	bbox := tegola.BoundingBox{
-		Maxx: 4096,
-		Maxy: 4096,
-	}
-	vtile, err := tile.VTile(bbox)
+	vtile, err := tile.VTile(geo.NewBound(0, 4096, 0, 4096))
 	if err != nil {
 		panic(err)
 	}

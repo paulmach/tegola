@@ -3,9 +3,8 @@ package mvt
 import (
 	"testing"
 
-	"github.com/terranodo/tegola"
-	"github.com/terranodo/tegola/basic"
-	"github.com/terranodo/tegola/mvt/vector_tile"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola/mvt/vector_tile"
 )
 
 func newTileLayer(name string, keys []string, values []*vectorTile.Tile_Value, features []*vectorTile.Tile_Feature) *vectorTile.Tile_Layer {
@@ -22,16 +21,11 @@ func newTileLayer(name string, keys []string, values []*vectorTile.Tile_Value, f
 }
 
 func TestLayer(t *testing.T) {
-	baseBBox := tegola.BoundingBox{
-		Minx: 0,
-		Miny: 0,
-		Maxx: 4096,
-		Maxy: 4096,
-	}
+	baseBBox := geo.NewBound(0, 4096, 0, 4096)
 	testcases := []struct {
 		layer   *Layer
 		vtlayer *vectorTile.Tile_Layer
-		bbox    tegola.BoundingBox
+		bbox    geo.Bound
 		eerr    error
 	}{
 		{
@@ -46,7 +40,7 @@ func TestLayer(t *testing.T) {
 				Name: "onefeature",
 				features: []Feature{
 					{
-						Geometry: &basic.Point{1, 1},
+						Geometry: geo.Point{1, 1},
 						Tags: map[string]interface{}{
 							"tag1": "tag",
 							"tag2": "tag",
@@ -64,12 +58,8 @@ func TestLayer(t *testing.T) {
 				Name: "twofeature",
 				features: []Feature{
 					{
-						Geometry: &basic.Polygon{
-							basic.Line{
-								basic.Point{3, 6},
-								basic.Point{8, 12},
-								basic.Point{20, 34},
-							},
+						Geometry: geo.Polygon{
+							{{3, 6}, {8, 12}, {20, 34}},
 						},
 						Tags: map[string]interface{}{
 							"tag1": "tag",
@@ -77,7 +67,7 @@ func TestLayer(t *testing.T) {
 						},
 					},
 					{
-						Geometry: &basic.Point{1, 1},
+						Geometry: geo.Point{1, 1},
 						Tags: map[string]interface{}{
 							"tag1": "tag",
 							"tag2": "tag",

@@ -15,10 +15,10 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/terranodo/tegola/mvt"
-	"github.com/terranodo/tegola/mvt/provider"
-	_ "github.com/terranodo/tegola/provider/postgis"
-	"github.com/terranodo/tegola/server"
+	"github.com/paulmach/tegola/mvt"
+	"github.com/paulmach/tegola/mvt/provider"
+	_ "github.com/paulmach/tegola/provider/postgis"
+	"github.com/paulmach/tegola/server"
 )
 
 var (

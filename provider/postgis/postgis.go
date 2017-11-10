@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola/wkb"
 
-	"github.com/terranodo/tegola"
-	"github.com/terranodo/tegola/basic"
-	"github.com/terranodo/tegola/mvt"
-	"github.com/terranodo/tegola/mvt/provider"
-	"github.com/terranodo/tegola/util/dict"
-	"github.com/terranodo/tegola/wkb"
+	"github.com/paulmach/tegola"
+	"github.com/paulmach/tegola/basic"
+	"github.com/paulmach/tegola/mvt"
+	"github.com/paulmach/tegola/mvt/provider"
+	"github.com/paulmach/tegola/util/dict"
 )
 
 // layer holds information about a query.
@@ -350,21 +351,21 @@ func (p Provider) MVTLayer(layerName string, tile tegola.Tile, tags map[string]i
 	}
 
 	textent := tile.BoundingBox()
-	minGeo, err := basic.FromWebMercator(plyr.SRID, &basic.Point{textent.Minx, textent.Miny})
+	minGeo, err := basic.FromWebMercator(plyr.SRID, textent.SouthWest())
 	if err != nil {
 		return nil, fmt.Errorf("Got error trying to convert tile point. %v ", err)
 	}
-	maxGeo, err := basic.FromWebMercator(plyr.SRID, &basic.Point{textent.Maxx, textent.Maxy})
+	maxGeo, err := basic.FromWebMercator(plyr.SRID, textent.NorthEast())
 	if err != nil {
 		return nil, fmt.Errorf("Got error trying to convert tile point. %v ", err)
 	}
-	minPt, ok := minGeo.(*basic.Point)
+	minPt, ok := minGeo.(geo.Point)
 	if !ok {
-		return nil, fmt.Errorf("Expected Point, got %t %v", minGeo)
+		return nil, fmt.Errorf("Expected Point, got %t %v", minGeo, minGeo)
 	}
-	maxPt, ok := maxGeo.(*basic.Point)
+	maxPt, ok := maxGeo.(geo.Point)
 	if !ok {
-		return nil, fmt.Errorf("Expected Point, got %t %v", maxGeo)
+		return nil, fmt.Errorf("Expected Point, got %t %v", maxGeo, maxGeo)
 	}
 
 	bbox := fmt.Sprintf("ST_MakeEnvelope(%v,%v,%v,%v,%v)", minPt.X(), minPt.Y(), maxPt.X(), maxPt.Y(), plyr.SRID)
@@ -392,7 +393,7 @@ func (p Provider) MVTLayer(layerName string, tile tegola.Tile, tags map[string]i
 
 	for rows.Next() {
 		count++
-		var geom tegola.Geometry
+		var geom geo.Geometry
 		var gid uint64
 		vals, err := rows.Values()
 		if err != nil {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/terranodo/tegola"
-	"github.com/terranodo/tegola/mvt/vector_tile"
-	"github.com/terranodo/tegola/wkb"
+	"github.com/paulmach/geo"
+	"github.com/paulmach/tegola/mvt/vector_tile"
+	"github.com/paulmach/tegola/wkb"
 )
 
 // errors
@@ -29,7 +29,7 @@ type Feature struct {
 	Tags map[string]interface{}
 	// Does not support the collection geometry, for this you have to create a feature for each
 	// geometry in the collection.
-	Geometry tegola.Geometry
+	Geometry geo.Geometry
 }
 
 func (f Feature) String() string {
@@ -42,27 +42,26 @@ func (f Feature) String() string {
 
 //NewFeatures returns one or more features for the given Geometry
 // TODO: Should we consider supporting validation of polygons and multiple polygons here?
-func NewFeatures(geo tegola.Geometry, tags map[string]interface{}) (f []Feature) {
-	if geo == nil {
+func NewFeatures(g geo.Geometry, tags map[string]interface{}) (f []Feature) {
+	if g == nil {
 		return f // return empty feature set for a nil geometry
 	}
 
-	if g, ok := geo.(tegola.Collection); ok {
-		geos := g.Geometries()
-		for i := range geos {
-			f = append(f, NewFeatures(geos[i], tags)...)
+	if c, ok := g.(geo.Collection); ok {
+		for i := range c {
+			f = append(f, NewFeatures(c[i], tags)...)
 		}
 		return f
 	}
 	f = append(f, Feature{
 		Tags:     tags,
-		Geometry: geo,
+		Geometry: g,
 	})
 	return f
 }
 
 // VTileFeature will return a vectorTile.Feature that would represent the Feature
-func (f *Feature) VTileFeature(keys []string, vals []interface{}, extent tegola.BoundingBox, layerExtent int) (tf *vectorTile.Tile_Feature, err error) {
+func (f *Feature) VTileFeature(keys []string, vals []interface{}, extent geo.Bound, layerExtent int) (tf *vectorTile.Tile_Feature, err error) {
 	tf = new(vectorTile.Tile_Feature)
 	tf.Id = f.ID
 	if tf.Tags, err = keyvalTagsMap(keys, vals, f); err != nil {
@@ -127,7 +126,7 @@ type cursor struct {
 	y int64
 
 	// The diamentions for the screen tile.
-	tile tegola.BoundingBox
+	tile geo.Bound
 
 	// The extent — it is an int, but to make computations easier and not lose precision
 	// Until we convert the ∆'s to int32.
@@ -138,27 +137,25 @@ type cursor struct {
 	yspan float64
 }
 
-func newCursor(tile tegola.BoundingBox, layerExtent int) *cursor {
-	xspan := tile.Maxx - tile.Minx
-	yspan := tile.Maxy - tile.Miny
+func newCursor(tile geo.Bound, layerExtent int) *cursor {
 	return &cursor{
 		extent: float64(layerExtent),
 		tile:   tile,
-		xspan:  xspan,
-		yspan:  yspan,
+		xspan:  tile[1][0] - tile[0][0],
+		yspan:  tile[1][1] - tile[0][1],
 	}
 }
 
 //	converts a point to a screen resolution point
-func (c *cursor) ScalePoint(p tegola.Point) (nx, ny int64) {
+func (c *cursor) ScalePoint(p geo.Point) (nx, ny int64) {
 
-	nx = int64((p.X() - c.tile.Minx) * c.extent / c.xspan)
-	ny = int64((p.Y() - c.tile.Miny) * c.extent / c.yspan)
+	nx = int64((p.X() - c.tile.Left()) * c.extent / c.xspan)
+	ny = int64((p.Y() - c.tile.Bottom()) * c.extent / c.yspan)
 
 	return nx, ny
 }
 
-func (c *cursor) GetDeltaPointAndUpdate(p tegola.Point) (dx, dy int64) {
+func (c *cursor) GetDeltaPointAndUpdate(p geo.Point) (dx, dy int64) {
 	ix, iy := c.ScalePoint(p)
 	//	computer our point delta
 	dx = ix - int64(c.x)
@@ -170,7 +167,7 @@ func (c *cursor) GetDeltaPointAndUpdate(p tegola.Point) (dx, dy int64) {
 	return dx, dy
 }
 
-func (c *cursor) encodeCmd(cmd uint32, points []tegola.Point) []uint32 {
+func (c *cursor) encodeCmd(cmd uint32, points []geo.Point) []uint32 {
 	if len(points) == 0 {
 		return []uint32{}
 	}
@@ -188,71 +185,63 @@ func (c *cursor) encodeCmd(cmd uint32, points []tegola.Point) []uint32 {
 	return g
 }
 
-func (c *cursor) MoveTo(points ...tegola.Point) []uint32 {
+func (c *cursor) MoveTo(points ...geo.Point) []uint32 {
 	return c.encodeCmd(uint32(NewCommand(cmdMoveTo, len(points))), points)
 }
-func (c *cursor) LineTo(points ...tegola.Point) []uint32 {
+func (c *cursor) LineTo(points ...geo.Point) []uint32 {
 	return c.encodeCmd(uint32(NewCommand(cmdLineTo, len(points))), points)
 }
 func (c *cursor) ClosePath() uint32 {
 	return uint32(NewCommand(cmdClosePath, 1))
 }
 
-// encodeGeometry will take a tegola.Geometry type and encode it according to the
+// encodeGeometry will take a geo.Geometry type and encode it according to the
 // mapbox vector_tile spec.
-func encodeGeometry(geo tegola.Geometry, extent tegola.BoundingBox, layerExtent int) (g []uint32, vtyp vectorTile.Tile_GeomType, err error) {
+func encodeGeometry(geom geo.Geometry, extent geo.Bound, layerExtent int) (g []uint32, vtyp vectorTile.Tile_GeomType, err error) {
 	//	new cursor
 	c := newCursor(extent, layerExtent)
-	if geo == nil {
+	if geom == nil {
 		return nil, vectorTile.Tile_UNKNOWN, ErrNilGeometryType
 	}
 
-	switch t := geo.(type) {
-	case tegola.Point:
+	switch t := geom.(type) {
+	case geo.Point:
 		g = append(g, c.MoveTo(t)...)
 		return g, vectorTile.Tile_POINT, nil
 
-	case tegola.Point3:
-		g = append(g, c.MoveTo(t)...)
+	// case tegola.Point3: TODO
+	// 	g = append(g, c.MoveTo(t)...)
+	// 	return g, vectorTile.Tile_POINT, nil
+
+	case geo.MultiPoint:
+		g = append(g, c.MoveTo(t...)...)
 		return g, vectorTile.Tile_POINT, nil
 
-	case tegola.MultiPoint:
-		g = append(g, c.MoveTo(t.Points()...)...)
-		return g, vectorTile.Tile_POINT, nil
-
-	case tegola.LineString:
-		points := t.Subpoints()
-		g = append(g, c.MoveTo(points[0])...)
-		g = append(g, c.LineTo(points[1:]...)...)
+	case geo.LineString:
+		g = append(g, c.MoveTo(t[0])...)
+		g = append(g, c.LineTo(t[1:]...)...)
 		return g, vectorTile.Tile_LINESTRING, nil
 
-	case tegola.MultiLine:
-		lines := t.Lines()
-		for _, l := range lines {
-			points := l.Subpoints()
-			g = append(g, c.MoveTo(points[0])...)
-			g = append(g, c.LineTo(points[1:]...)...)
+	case geo.MultiLineString:
+		for _, l := range t {
+			g = append(g, c.MoveTo(l[0])...)
+			g = append(g, c.LineTo(l[1:]...)...)
 		}
 		return g, vectorTile.Tile_LINESTRING, nil
 
-	case tegola.Polygon:
-		lines := t.Sublines()
-		for _, l := range lines {
-			points := l.Subpoints()
-			g = append(g, c.MoveTo(points[0])...)
-			g = append(g, c.LineTo(points[1:]...)...)
+	case geo.Polygon:
+		for _, r := range t {
+			g = append(g, c.MoveTo(r[0])...)
+			g = append(g, c.LineTo(r[1:]...)...)
 			g = append(g, c.ClosePath())
 		}
 		return g, vectorTile.Tile_POLYGON, nil
 
-	case tegola.MultiPolygon:
-		polygons := t.Polygons()
-		for _, p := range polygons {
-			lines := p.Sublines()
-			for _, l := range lines {
-				points := l.Subpoints()
-				g = append(g, c.MoveTo(points[0])...)
-				g = append(g, c.LineTo(points[1:]...)...)
+	case geo.MultiPolygon:
+		for _, p := range t {
+			for _, r := range p {
+				g = append(g, c.MoveTo(r[0])...)
+				g = append(g, c.LineTo(r[1:]...)...)
 				g = append(g, c.ClosePath())
 				// g = append(g, c.MoveTo(&basic.Point{extent.Minx, extent.Miny})...)
 			}
@@ -260,7 +249,7 @@ func encodeGeometry(geo tegola.Geometry, extent tegola.BoundingBox, layerExtent 
 		return g, vectorTile.Tile_POLYGON, nil
 
 	default:
-		log.Printf("Geo: %v : %T", wkb.WKT(geo), geo)
+		log.Printf("Geo: %v : %T", wkb.WKT(geom), geom)
 		return nil, vectorTile.Tile_UNKNOWN, ErrUnknownGeometryType
 	}
 }
